@@ -50,6 +50,18 @@ def get_permission_sets_and_policies(filter_type=None, pattern=None):
             ps_dir = os.path.join(output_dir, permission_set_name)
             os.makedirs(ps_dir, exist_ok=True)
             
+            # Save Metadata
+            metadata = {
+                'Name': ps_details.get('Name'),
+                'Description': ps_details.get('Description'),
+                'PermissionSetArn': ps_details.get('PermissionSetArn'),
+                'CreatedDate': ps_details.get('CreatedDate').isoformat(),
+                'SessionDuration': ps_details.get('SessionDuration'),
+                'RelayState': ps_details.get('RelayState')
+            }
+            with open(os.path.join(ps_dir, 'metadata.json'), 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
             # Get Inline Policy
             try:
                 inline_policy = sso_admin.get_inline_policy_for_permission_set(
@@ -76,6 +88,30 @@ def get_permission_sets_and_policies(filter_type=None, pattern=None):
             except ClientError as e:
                 if e.response['Error']['Code'] != 'ResourceNotFoundException':
                     print(f"Error getting boundary for {permission_set_name}: {e}")
+            
+            # Get Managed Policies
+            try:
+                managed_policies = sso_admin.list_managed_policies_in_permission_set(
+                    InstanceArn=instance_arn,
+                    PermissionSetArn=ps_arn
+                )['AttachedManagedPolicies']
+                
+                with open(os.path.join(ps_dir, 'managed-policies.json'), 'w') as f:
+                    json.dump(managed_policies, f, indent=2)
+            except ClientError as e:
+                print(f"Error getting managed policies for {permission_set_name}: {e}")
+            
+            # Get Tags
+            try:
+                tags = sso_admin.list_tags_for_resource(
+                    InstanceArn=instance_arn,
+                    ResourceArn=ps_arn
+                )['Tags']
+                
+                with open(os.path.join(ps_dir, 'tags.json'), 'w') as f:
+                    json.dump(tags, f, indent=2)
+            except ClientError as e:
+                print(f"Error getting tags for {permission_set_name}: {e}")
                     
         print(f"Permission sets and policies have been saved to {output_dir}")
         
